@@ -1,0 +1,2 @@
+class DatabaseDependency:
+    pass

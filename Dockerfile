@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS base
+FROM python:3.13-slim AS base
 
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONHASHSEED=random \
@@ -10,30 +10,21 @@ FROM base AS builder
 
 ENV PIP_DEFAULT_TIMEOUT=100 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1 \
-    POETRY_VERSION=2.0.1
+    PIP_NO_CACHE_DIR=1
+COPY --from=ghcr.io/astral-sh/uv:0.7.16 /uv /uvx /bin/
 
-RUN pip install "poetry==$POETRY_VERSION"
+COPY pyproject.toml uv.lock ./
 
-COPY pyproject.toml poetry.lock ./
-
-# if your project is stored in src, uncomment line below
-# or this if your file is stored in $PROJECT_NAME, assuming `myproject`
-#COPY myproject ./myproject
-RUN poetry config virtualenvs.in-project true && \
-    poetry lock
-
-RUN poetry export --without-hashes -o requirements.txt && \
-    poetry run python -m pip wheel --no-cache-dir --wheel-dir=/app/dist -r requirements.txt
+RUN uv pip install --system -e .
 
 
 FROM base AS final
 
-COPY --from=builder /app/.venv ./.venv
-COPY --from=builder /app/dist /app/dist
-
-RUN ./.venv/bin/pip install /app/dist/*.whl
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY app ./app
 
-CMD ["./.venv/bin/uvicorn", "app.__main__:app", "--host", "0.0.0.0", "--port", "80"]
+EXPOSE 80
+
+CMD ["/usr/local/bin/uvicorn", "app.__main__:app", "--host", "0.0.0.0", "--port", "80"]

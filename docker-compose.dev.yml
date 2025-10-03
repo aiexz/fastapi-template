@@ -1,0 +1,86 @@
+services:
+  app:
+    build: .
+    container_name: fastapi_app
+    depends_on:
+      - db
+      - victoriametrics
+      - tempo
+    ports:
+      - "8000:8000"
+    environment:
+      SERVICE_NAME: fastapi-app
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/postgres
+      OTPL_METRICS_ENDPOINT: http://victoriametrics:8428/opentelemetry/v1/metrics
+      OTPL_TRACE_ENDPOINT: http://tempo:4317/v1/traces
+    networks:
+      - monitoring
+      - default
+
+  db:
+    image: postgres:15
+    container_name: fastapi_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - default
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoriametrics
+    ports:
+      - "8428:8428"
+    volumes:
+      - vmdata:/victoria-metrics-data
+    networks:
+      - monitoring
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yml" ]
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "3200:3200" # Query frontend for Grafana
+    environment:
+      - TEMPO_LOG_LEVEL=info
+    volumes:
+      - tempo-data:/var/tempo
+      - ./infra/tempo/tempo.yml:/etc/tempo.yml
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    depends_on:
+      - victoriametrics
+      - tempo
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_INSTALL_PLUGINS: "victoriametrics-metrics-datasource"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - monitoring
+
+volumes:
+  pgdata:
+  vmdata:
+  tempo-data:
+  grafana-storage:
+
+networks:
+  monitoring:
+    driver: bridge

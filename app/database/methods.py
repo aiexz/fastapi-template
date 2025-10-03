@@ -7,7 +7,7 @@ from .models import User
 class Database:
     def __init__(self, db_url: str):
         self.db_url = db_url
-        self.engine = create_async_engine(db_url)
+        self.engine = create_async_engine(db_url, pool_recycle=3600, echo=False)
         self.sessionmaker = async_sessionmaker(bind=self.engine)
 
     def __call__(self):
@@ -30,6 +30,3 @@ class Database:
                     .where(User.id == user_id)
             )
             return asset.scalars().first()
-
-    def __del__(self):
-        self.engine.dispose()

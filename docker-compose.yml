@@ -1,0 +1,11 @@
+services:
+  app:
+    image: docker.io/image:0.1.0
+    container_name: fastapi_app
+    ports:
+      - "8000:8000"
+    environment:
+      SERVICE_NAME: fastapi-app
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/postgres
+      OTPL_METRICS_ENDPOINT: http://victoriametrics:8428/opentelemetry/v1/metrics
+      OTPL_TRACE_ENDPOINT: http://tempo:4317/v1/traces
